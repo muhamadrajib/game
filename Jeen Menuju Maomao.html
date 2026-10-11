@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Jeen Menuju Maomao</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#14112b;--panel:#241f52;--amber:#f6c667;--rose:#f49ab0;--paper:#f3e9dc;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*,*:before,*:after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100svh;background:var(--bg);color:var(--paper);font-family:Nunito,system-ui,sans-serif;font-weight:600;display:flex;justify-content:center}
+button{font:inherit}
+:focus-visible{outline:3px solid var(--amber);outline-offset:3px}
+.wrap{width:100%;max-width:580px;padding:18px 14px 28px}
+.hud{display:flex;align-items:center;gap:12px;margin-bottom:10px;font-family:"Press Start 2P",monospace;font-size:.7rem}
+#hc{color:var(--rose);min-width:4.5em}
+.track{flex:1;height:10px;background:#2f2a63;border-radius:2px;position:relative}
+.track i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--amber);border-radius:2px}
+.lbl{display:flex;justify-content:space-between;font-size:.8rem;color:#b9b2d6;margin:-4px 0 10px;padding-left:calc(4.5em + 12px)}
+#stage{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;border-radius:6px;overflow:hidden;box-shadow:0 0 0 3px #3b3470}
+canvas{display:block;width:100%;height:auto;image-rendering:pixelated}
+.ov{position:absolute;inset:0;background:rgba(20,17,43,.86);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;gap:12px}
+.ov[hidden]{display:none}
+.ov h1,.ov h2{font-family:"Press Start 2P",monospace;font-weight:400;font-size:clamp(.85rem,3.6vw,1.15rem);line-height:1.6;margin:0;color:var(--amber)}
+.ov p{margin:0;max-width:30em;font-size:.98rem;line-height:1.5}
+.ov button{background:var(--amber);color:#2a2030;border:0;border-radius:4px;padding:12px 22px;font-family:"Press Start 2P",monospace;font-size:.72rem;cursor:pointer;box-shadow:0 4px 0 #b38a2e}
+.ov button:active{transform:translateY(3px);box-shadow:0 1px 0 #b38a2e}
+#toast{min-height:1.6em;margin:10px 2px 0;text-align:center;color:#d8d2ee}
+.how{margin:6px 2px 0;text-align:center;font-size:.85rem;color:#8f89b3}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hud"><span id="hc">♥ 0</span><div class="track"><i id="fill"></i></div></div>
+  <div class="lbl"><span>Jeen</span><span>Maomao</span></div>
+  <div id="stage">
+    <canvas id="c" width="360" height="220" aria-label="Game: Jeen berlari menuju Maomao"></canvas>
+    <div class="ov" id="startov">
+      <h1>Jeen menuju Maomao</h1>
+      <p>Jeen mau ketemu Maomao. Ketuk layar atau tekan spasi buat lompat. Kumpulin hati, hindari sinyal putus dan tugas kuliah.</p>
+      <button id="start">MULAI</button>
+    </div>
+    <div class="ov" id="endov" hidden>
+      <h2>Ketemu juga, Maomao</h2>
+      <p>Jeen sampai di sebelahmu. Dari tadi yang dikumpulin cuma satu hal: alasan buat terus jalan ke arahmu.</p>
+      <p id="score"></p>
+      <p style="font-size:1.1rem;color:#f49ab0">dari Jeen, buat kamu.</p>
+      <button id="again">MAIN LAGI</button>
+    </div>
+  </div>
+  <p id="toast" aria-live="polite"></p>
+  <p class="how">Lompat: ketuk layar, spasi, atau panah atas</p>
+</div>
+
+<script>
+(function(){
+var $=function(i){return document.getElementById(i)};
+var cv=$('c'),ctx=cv.getContext('2d'),W=360,H=220,GY=178,PX=56,GOAL=3400;
+var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+var st='idle',dist=0,hearts=0,total=0,vy=0,py=GY,items=[],parts=[],nextAt=0,inv=0,stun=0,buf=0,fr=0,last=0,tt=0,tmo=0;
+var stars=[];for(var i=0;i<45;i++)stars.push([Math.random()*W,Math.random()*120,Math.random()<.2?2:1]);
+var sky=ctx.createLinearGradient(0,0,0,GY);sky.addColorStop(0,'#241f52');sky.addColorStop(.7,'#7a4a8a');sky.addColorStop(1,'#ff9a8b');
+var HP=['01010','11111','11111','01110','00100'];
+
+function R(c,x,y,w,h){ctx.fillStyle=c;ctx.fillRect(Math.round(x),Math.round(y),w,h);}
+function heart(x,y,s,c){ctx.fillStyle=c;for(var r=0;r<5;r++)for(var k=0;k<5;k++)if(HP[r].charAt(k)==='1')ctx.fillRect(Math.round(x+k*s),Math.round(y+r*s),s,s);}
+function person(x,y,body,hair,long,f,air){
+  var d='#2a1d2e';
+  R(hair,x+1,y-17,8,3);R('#ffd9b0',x+1,y-14,8,6);
+  if(long){R(hair,x,y-16,2,11);R(hair,x+8,y-16,2,11);}
+  R(d,x+3,y-12,1,1);R(d,x+6,y-12,1,1);
+  R(body,x+1,y-8,8,long?8:6);
+  if(!long){var a=air?0:f%2;R(d,x+2,y-2+(a?0:-1),2,2);R(d,x+6,y-2+(a?-1:0),2,2);}
+}
+function toast(m){$('toast').textContent=m;clearTimeout(tmo);tmo=setTimeout(function(){$('toast').textContent='';},1800);}
+function burst(x,y,n){if(reduce)n=Math.ceil(n/3);for(var i=0;i<n;i++)parts.push({x:x,y:y,vx:(Math.random()-.5)*130,vy:-30-Math.random()*100,l:1});}
+
+function reset(){dist=0;hearts=0;total=0;vy=0;py=GY;items=[];parts=[];nextAt=140;inv=0;stun=0;buf=0;$('hc').textContent='♥ 0';$('fill').style.width='0';$('toast').textContent='';}
+function spawn(){
+  var wx=dist+W+10,r=Math.random(),i;
+  if(r<.3)items.push({k:'s',x:wx,w:14,h:14});
+  else if(r<.5)items.push({k:'t',x:wx,w:16,h:24});
+  else if(r<.78){
+    var o={k:Math.random()<.5?'s':'t',x:wx};o.w=o.k==='s'?14:16;o.h=o.k==='s'?14:24;items.push(o);
+    for(i=0;i<3;i++)items.push({k:'h',x:wx-18+i*18,y:GY-52-(i===1?6:0)});total+=3;
+  }else{var hy=Math.random()<.5?GY-14:GY-44;for(i=0;i<3;i++)items.push({k:'h',x:wx+i*20,y:hy});total+=3;}
+  nextAt=dist+150+Math.random()*110;
+}
+function update(dt){
+  if(st==='play'){
+    var target=stun>0?0:105+25*(dist/GOAL);
+    dist+=target*dt;
+    if(buf>0){buf-=dt;if(py>=GY){vy=-320;buf=0;}}
+    vy+=900*dt;py+=vy*dt;if(py>=GY){py=GY;vy=0;}
+    if(inv>0)inv-=dt;if(stun>0)stun-=dt;
+    if(dist>=nextAt&&dist<GOAL-300)spawn();
+    for(var i=items.length-1;i>=0;i--){
+      var it=items[i],sx=it.x-dist;
+      if(sx<-30){items.splice(i,1);continue;}
+      if(it.k==='h'){
+        if(sx>PX-6&&sx<PX+14&&Math.abs(it.y+5-(py-8))<14){items.splice(i,1);hearts++;$('hc').textContent='♥ '+hearts;burst(PX+5,py-10,3);}
+      }else if(inv<=0&&sx<PX+10&&sx+it.w>PX+1&&py>GY-it.h){
+        inv=1.6;stun=.5;toast(it.k==='s'?'Sinyal putus. Tunggu bentar...':'Tugas kuliah numpuk. Kepleset dikit.');
+      }
+    }
+    $('fill').style.width=Math.min(100,dist/GOAL*100)+'%';
+    if(dist>=GOAL){st='won';burst(PX+30,GY-30,30);setTimeout(showEnd,1400);}
+  }
+  for(var j=parts.length-1;j>=0;j--){var p=parts[j];p.vy+=200*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.l-=dt;if(p.l<=0)parts.splice(j,1);}
+}
+function showEnd(){
+  var s=$('score');
+  s.textContent='Hati yang kekumpul: '+hearts+' dari '+total+'. '+(hearts===total?'Nggak ada yang kelewat. Sama kayak kamu, nggak pernah kelewat buat aku.':'Ada yang kelewat, tapi nggak apa-apa. Stok sayangku nggak ada habisnya.');
+  $('endov').hidden=false;st='end';
+}
+function draw(){
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+  for(var i=0;i<stars.length;i++){var s=stars[i],x=((s[0]-dist*.04)%W+W)%W;R('rgba(255,255,255,'+(.4+.4*Math.sin(tt*2+i))+')',x,s[1],s[2],s[2]);}
+  ctx.fillStyle='#ffe9b8';ctx.beginPath();ctx.arc(300,40,16,0,7);ctx.fill();
+  for(var L=0;L<2;L++){var f=L?.5:.25,c=L?'#1f1b43':'#3a2a64';ctx.fillStyle=c;
+    for(var x2=0;x2<W;x2+=4){var h=(L?24:36)+Math.sin((x2+dist*f)/(L?30:44))*10+Math.sin((x2+dist*f)/17)*4;ctx.fillRect(x2,GY-h,4,h);}}
+  R('#15122e',0,GY,W,H-GY);R('#2f2a63',0,GY,W,2);
+  for(var g=-((dist%28));g<W;g+=28)R('#241f52',g,GY+10,14,2);
+  for(var k=0;k<items.length;k++){
+    var it=items[k],sx=it.x-dist;
+    if(it.k==='h')heart(sx,it.y-5+Math.sin(tt*4+k)*1.5,2,'#f49ab0');
+    else if(it.k==='s'){R('#5b4b8a',sx,GY-14,14,14);R('#ff6b5b',sx+3,GY-11,2,2);R('#ff6b5b',sx+9,GY-11,2,2);R('#ff6b5b',sx+6,GY-8,2,2);R('#ff6b5b',sx+3,GY-5,2,2);R('#ff6b5b',sx+9,GY-5,2,2);}
+    else{R('#f3e9dc',sx,GY-24,16,24);R('#b6aec8',sx+3,GY-19,10,2);R('#b6aec8',sx+3,GY-14,10,2);R('#ff6b5b',sx+3,GY-8,6,3);}
+  }
+  var mx=GOAL-dist+PX+20;
+  if(mx<W+20){person(mx,GY,'#f49ab0','#4a2c3a',true,0,false);heart(mx+2,GY-34+Math.sin(tt*4)*2,2,'#f49ab0');}
+  if(!(inv>0&&st==='play'&&Math.floor(inv*12)%2))person(PX,py,'#f6c667','#2a1d2e',false,fr,py<GY);
+  for(var q=0;q<parts.length;q++){var p=parts[q];ctx.globalAlpha=Math.max(0,p.l);heart(p.x,p.y,2,'#f49ab0');}
+  ctx.globalAlpha=1;
+}
+function loop(t){
+  var dt=Math.min(.05,(t-last)/1000||0);last=t;tt+=dt;
+  if(st==='play'&&stun<=0)fr=Math.floor(tt*9);
+  update(dt);draw();requestAnimationFrame(loop);
+}
+function jump(e){if(st==='play'){e.preventDefault();buf=.12;}}
+$('stage').addEventListener('pointerdown',jump);
+window.addEventListener('keydown',function(e){if(e.code==='Space'||e.code==='ArrowUp'||e.code==='KeyW')jump(e);});
+function begin(){reset();$('startov').hidden=true;$('endov').hidden=true;st='play';}
+$('start').addEventListener('click',begin);
+$('again').addEventListener('click',begin);
+reset();requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
